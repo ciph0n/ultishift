@@ -85,12 +85,12 @@ note: having a key length over 100+ characters for pkey/rd1/rd2 may take longer 
 
 Any of these private keys are required in order for message encryption/decryption, you should have these keys 100+ characters.
 
-* `privatekey: [please_insert_a_excessively_long_key]`
+* `privatekey: "[please_insert_a_excessively_long_key]"`
 
 The `privatekey` is best to be generated 100+ characters using case sensitive characters, numbers, and symbols.
 
-* `randomdata1: [please_insert_a_excessively_long_key]`
-* `randomdata2: [please_insert_a_excessively_long_key]`
+* `randomdata1: "[please_insert_a_excessively_long_key]"`
+* `randomdata2: "[please_insert_a_excessively_long_key]"`
 
 `randomdata1` and `randomdata2` are both used in the encryption/decryption process to make the 'secret key'. This essentially acts as two salts to the private key making the key way more complex.
 
@@ -110,7 +110,7 @@ desdata2 is required to be 32 characters long, and the best practice is to have 
 
 ### File
 
-* `filekey: filekey[please_insert_a_excessively_long_key]`
+* `filekey: "filekey[please_insert_a_excessively_long_key]"`
 
 You can encrypt/decrypt a file of any length, and this will be the private key for file encryption/decryption that will allow your peer to encrypt/decrypt a file with. 
 

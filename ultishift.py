@@ -1,11 +1,11 @@
-import hashlib, base64, string, pyDes, os, yaml, shutil, re, sys
-from Cryptodome.Cipher import AES
+import datetime, hashlib, base64, string, pyDes, os, yaml, shutil, re, sys
 from Cryptodome.Random import get_random_bytes
+from Cryptodome.Cipher import AES
 
 # declare global variables
 path = os.getenv("APPDATA")
 version = 'CReader-6'
-pathList = [f'{path}/ultishift', f'{path}/ultishift/fileconvert', f'{path}/ultishift/fileconvert/encrypted', f'{path}/ultishift/fileconvert/decrypted', f'{path}/ultishift/config']
+pathList = [f'{path}/ultishift', f'{path}/ultishift/fileconvert', f'{path}/ultishift/notes', f'{path}/ultishift/fileconvert/encrypted', f'{path}/ultishift/fileconvert/decrypted', f'{path}/ultishift/config']
 fileList = [f'{path}/ultishift/config/defaultconfig.yaml']
 defaultData = ['"[please_insert_a_excessively_long_key]"', '"[please_insert_a_excessively_long_key]"', '"[please_insert_a_excessively_long_key]"', '11charsnumb', '32randommixedcharacterandnumbers', '"filekey[please_insert_a_excessively_long_key]"', '123456789123456789']
 
@@ -68,7 +68,6 @@ def fileintegrity():
         with open(f'{path}/defaultconfig.yaml','w') as file:
             file.write(configfile)
         file.close()
-
 
 def configloader(filename, noexceptions=False):
     try:
@@ -228,9 +227,6 @@ def encryptor(message, password):
     # cipher the information again
     bigkey = cencrypt(important, 45, decrypt=False)
 
-    # Building the information for TripleDes
-    strToEncrypt = bigkey
-
     try:
         k = pyDes.triple_des(
             base64.b64decode(privatekey('key')),
@@ -238,31 +234,28 @@ def encryptor(message, password):
             IV=base64.b64decode(privatekey('iv')),
             padmode=pyDes.PAD_PKCS5
         )
-        encryptedStr = k.encrypt(strToEncrypt)
+        encryptedStr = k.encrypt(bigkey)
     except:
         return print(f'[ERROR] (Encryptor): \'desencrypt\' seems to contain symbols.')
 
     # setting it to base64
-    decodeddes = base64.b64encode(encryptedStr)
-    decodeddes = bytes.decode(decodeddes)
+    decodeddes = bytes.decode(base64.b64encode(encryptedStr))
 
+    # cipher
     desunciphered = cencrypt(decodeddes, 54, decrypt=False)
 
-    # create the password
-    secretkey = privatekey('privatekey')
-
     # use the dynamic 
-    corekey = aesencrypt(desunciphered, secretkey)
+    corekey = aesencrypt(desunciphered, privatekey('privatekey'))
 
     # cipher the dynamicly generated AES
     publickey = cencrypt(corekey, 28, decrypt=False)
 
-    # share this message
+    # exportable and encrypted message
     if discordformat == '```' and peerid != '':
         if password != '':
-            return print(f'Encrypted message: \n\n{peerid} `{password}`\n{discordformat}{publickey}{discordformat}')
-        return print(f'Encrypted message: \n\n{peerid}\n{discordformat}{publickey}{discordformat}')
-    return print(f'Encrypted message: \n\n{discordformat}{publickey}{discordformat}')
+            return f'{peerid} `{password}`\n{discordformat}{publickey}{discordformat}'
+        return f'{peerid}\n{discordformat}{publickey}{discordformat}'
+    return f'{discordformat}{publickey}{discordformat}'
 
 def decryptor(msg, password):
     # lets reverse this message
@@ -296,7 +289,7 @@ def decryptor(msg, password):
     bigkey = cencrypt(decryptedStr, 45, decrypt=True)
 
     # deciphering the ciphered message
-    deimportant = cencrypt(bigkey, 86, decrypt=True)  
+    deimportant = cencrypt(bigkey, 86, decrypt=True)
 
     try:
         # decrypt the aes without private key
@@ -304,30 +297,24 @@ def decryptor(msg, password):
     except:
         return print('\n[ERROR] Password is incorrect.')
 
-    return print(f'Decrypted message: \n\n{decrypted}')
+    # exportable and decrypted message
+    return decrypted
 
 def aesencrypt(message, password):
     # generate salt
     salt = get_random_bytes(AES.block_size)
 
     # generate the private key via salt/pass
-    private_key = hashlib.scrypt(
-        password.encode(), salt=salt, n=2**14, r=8, p=1, dklen=32)
+    private_key = hashlib.scrypt(password.encode(), salt=salt, n=2**14, r=8, p=1, dklen=32)
     
     # create the cipher config
     cipher_config = AES.new(private_key, AES.MODE_GCM)
 
     # decrypt the cipher text
     cipher_text, tag = cipher_config.encrypt_and_digest(bytes(message, 'utf-8'))
-
-    # encode the data in base64
-    pciphertext = base64.b64encode(cipher_text).decode('utf-8')
-    psalt = base64.b64encode(salt).decode('utf-8')
-    pnonce = base64.b64encode(cipher_config.nonce).decode('utf-8')
-    ptag = base64.b64encode(tag).decode('utf-8')
     
     # format the data
-    data = f'{pciphertext},{psalt},{pnonce},{ptag}'
+    data = f'{base64.b64encode(cipher_text).decode("utf-8")},{base64.b64encode(salt).decode("utf-8")},{base64.b64encode(cipher_config.nonce).decode("utf-8")},{base64.b64encode(tag).decode("utf-8")}'
 
     return data
 
@@ -335,34 +322,19 @@ def aesdecrypt(encryptedmessage, password, useprivatekey=False):
     # create an array and split strings
     privatearray = encryptedmessage.split(',')
 
-    # create the variables from the array
-    acipherdata = privatearray[0]
-    asalt = privatearray[1]
-    anonce = privatearray[2]
-    atag = privatearray[3]
+    # {cipherdata:privatearray[0], salt:privatearray[1], nonce:privatearray[2], tag:privatearray[3]}
 
-    # decode the dictionary entries from base64
-    ksalt = base64.b64decode(asalt)
-    kcipherdata = base64.b64decode(acipherdata)
-    knonce = base64.b64decode(anonce)
-    ktag = base64.b64decode(atag)
-
+    # generate the private key via salt/pass
     if useprivatekey == True:
-        # develop the key
-        secretkey = privatekey('privatekey')
-        # generate the private key via salt/pass
-        kprivate_key = hashlib.scrypt(
-            secretkey.encode(), salt=ksalt, n=2**14, r=8, p=1, dklen=32)
+        kprivate_key = hashlib.scrypt(privatekey('privatekey').encode(), salt=base64.b64decode(privatearray[1]), n=2**14, r=8, p=1, dklen=32)
     else:
-        # generate the private key via salt/pass
-        kprivate_key = hashlib.scrypt(
-            password.encode(), salt=ksalt, n=2**14, r=8, p=1, dklen=32)
+        kprivate_key = hashlib.scrypt(password.encode(), salt=base64.b64decode(privatearray[1]), n=2**14, r=8, p=1, dklen=32)
 
     # create the cipher config
-    kcipher = AES.new(kprivate_key, AES.MODE_GCM, nonce=knonce)
+    kcipher = AES.new(kprivate_key, AES.MODE_GCM, nonce=base64.b64decode(privatearray[2]))
 
     # decrypt the cipher text
-    kdecrypted = kcipher.decrypt_and_verify(kcipherdata, ktag)
+    kdecrypted = kcipher.decrypt_and_verify(base64.b64decode(privatearray[0]), base64.b64decode(privatearray[3]))
  
     return bytes.decode(kdecrypted)
 
@@ -437,17 +409,91 @@ def filedecrypt(filename, extension):
     else:
         return print(f'[ERROR] (FileEncrypt): \'{filename}{extension}\' doesn\'t exist.')
 
+def np_encrypt(filename, data, password):
+    """ Establishing a byte array to store encrypted text in """
+    byte_msg_arr = []
+    for bytes in encryptor(data, password).encode('utf-8'):
+        byte_msg_arr.append(bytes)
+    
+    """ Exporting the note without a password """
+    if password == '':
+        file = open(f'{path}/ultishift/notes/{filename}.ults', 'w')
+        file.write('\n')
+        for bytes in byte_msg_arr:
+            file.write(f'{str(bytes)} ')
+        file.close()
+    else:
+        file = open(f'{path}/ultishift/notes/{filename}.ults', 'w')
+        
+        byte_pass_arr = []
+        for bytez in encryptor(password, '').encode('utf-8'):
+            byte_pass_arr.append(bytez)
+        
+        for bytez in byte_pass_arr:
+            file.write(f'{str(bytez)} ')
+        file.write('\n')
+
+        for bytes in byte_msg_arr:
+            file.write(f'{str(bytes)} ')
+        file.close()
+
+    return f'SUCCESS: "{filename}.ults" has been created!'
+
+def np_decrypt(filename):
+    try:
+        file = open(f'{path}/ultishift/notes/{filename}.ults', 'r').readlines()
+    except FileNotFoundError:
+        return f'[X] ERROR: "{filename}.ults" was not found.'
+    counter = 0
+    password = ''
+    byte_pass_arr = []
+    byte_msg_arr = []
+    for line in file:
+        if counter == 0:
+            if len(line) > 1:
+                """ Remove spaces from the line """
+                line_data = line.split(' ')
+                line_data.pop(-1)
+
+                """ Establishing a byte array to store encrypted password text in """
+                for data in line_data:
+                    byte_pass_arr.append(int(data))
+                
+                """ Decrypt the password given """
+                password = decryptor(''.join(map(chr, bytes(byte_pass_arr))), '')
+            else:
+                password = ''
+        else:
+            """ Remove spaces from the line """
+            line_data = line.split(' ')
+            line_data.pop(-1)
+
+            """ Establishing a byte array to store encrypted text in """
+            for data in line_data:
+                byte_msg_arr.append(int(data))
+        counter += 1
+
+    """ Decrypting the note """
+    return decryptor(''.join(map(chr, bytes(byte_msg_arr))), password)
+
+def np_list(directory):
+    notes = ''
+    for files in os.listdir(directory):
+        if '.ults' or '.yaml' in files:
+            notes += f'[#] {files}\n'
+    return notes
+
 def main():
     try:
-        text = input(f'--------------------------------------------\n--> Ultishift | Loaded: {loadedfile}\n--------------------------------------------\n[A] Encrypt\n[B] Decrypt\n[C] File Encrypt\n[D] File Decrypt\n[E] Config Loader\n[X] Exit\n\nSelection: ')
+        text = input(f'{"-"*44}\n--> Ultishift | Loaded: {loadedfile}\n{"-"*44}\n[A] Encrypt\n[B] Decrypt\n[C] File Encrypt\n[D] File Decrypt\n[E] Notepad - Encrypt\n[F] Notepad - Decrypt\n[G] Config Loader\n[X] Exit\n\nSelection: ')
         if text.lower() == 'a': # message encrypt only
             password = input('Password: ')
             data = str(input('Text2Encrypt: '))
-            encryptor(data, password)
+            print(f'\n\n{encryptor(data, password)}')
         elif text.lower() == 'b': # message decrypt only
             password = input('Password: ')
             data = str(input('Text2Decrypt: '))
-            decryptor(data, password)
+            print(f'\n\n{decryptor(data, password)}')
         elif text.lower() == 'c': # file encrypt only
             data = str(input('Filename2Encrypt: '))
             filext = str(input('File extension [.*]: '))
@@ -456,9 +502,35 @@ def main():
             data = str(input('Filename2Decrypt: '))
             filext = str(input('File extension [.bin]: '))
             filedecrypt(data, filext)
-        elif text.lower() == 'e': # config loader
+        elif text.lower() == 'e': # notepad - encrypt
+            print(f'{"=="*10}\nNotes in Directory:\n{np_list(f"{path}/ultishift/notes")}')
+            filename = input('[Encryption] Filename [no ext]: ')
+            if len(filename) != 0:
+                password = input('Password: ')
+                data = ''
+                data += f'This note was written on: {datetime.datetime.now()}\n\n'
+                while True:
+                    msg = str(input('Done? Type: "::end"-> '))
+                    if msg == '::end':
+                        break
+                    data += f'{msg}\n'
+                print(f'\n{np_encrypt(filename, data, password)}')
+            else:
+                print('\n[ERROR] You cannot write a nameless note.')
+        elif text.lower() == 'f': # notepad - decrypt
+            print(f'{"=="*10}\nNotes in Directory:\n{np_list(f"{path}/ultishift/notes")}')
+            filename = str(input('[Decryption] Filename [no ext]: '))
+            if len(filename) != 0:
+                print(f'\n{np_decrypt(filename)}')
+            else:
+                print('\n[ERROR] You cannot write a nameless note.')
+        elif text.lower() == 'g': # config loader
+            print(f'{"=="*10}\nConfigs in Directory:\n{np_list(f"{path}/ultishift/config")}')
             data = str(input('File2Load [name.yaml]: '))
-            configloader(data, noexceptions=True)
+            try:
+                configloader(data, noexceptions=True)
+            except PermissionError:
+                print('\n[ERROR] Permission denied in "/config".')
         elif text.lower() == 'x':
             print('\nExiting..')
             sys.exit()

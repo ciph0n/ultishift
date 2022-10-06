@@ -1,34 +1,32 @@
-import datetime, hashlib, base64, string, pyDes, os, yaml, shutil, re, sys
+import datetime, hashlib, base64, string, pyDes, yaml, shutil, re, sys, os
+from dotenv import dotenv_values
 from Cryptodome.Random import get_random_bytes
 from Cryptodome.Cipher import AES
 
 # declare global variables
-path = os.getenv("APPDATA")
 version = 'CReader-6'
+loaded_config = None
+config_filename = 'defaultconfig.ults'
+path = "C:\\Z_VSC\\ultishift-main\\test\\"
 pathList = [f'{path}/ultishift', f'{path}/ultishift/fileconvert', f'{path}/ultishift/notes', f'{path}/ultishift/fileconvert/encrypted', f'{path}/ultishift/fileconvert/decrypted', f'{path}/ultishift/config']
-fileList = [f'{path}/ultishift/config/defaultconfig.yaml']
+fileList = [f'{path}/ultishift/config/defaultconfig.ults']
 defaultData = ['"[please_insert_a_excessively_long_key]"', '"[please_insert_a_excessively_long_key]"', '"[please_insert_a_excessively_long_key]"', '11charsnumb', '32randommixedcharacterandnumbers', '"filekey[please_insert_a_excessively_long_key]"', '123456789123456789']
 
 def fileintegrity():
+    global path, loaded_config#, version, config
     # define success rate
     passed = 0
     failed = 0
 
     # declare config file contents
-    configfile = 'class:'\
-            f'\n    - identification: {version}'\
-        '\nprivate:'\
-            '\n    - privatekey: "[please_insert_a_excessively_long_key]"'\
-            '\n    - randomdata1: "[please_insert_a_excessively_long_key]"'\
-            '\n    - randomdata2: "[please_insert_a_excessively_long_key]"'\
-        '\ndesencrypt:'\
-            '\n    - desdata1: 11charsnumb'\
-            '\n    - desdata2: 32randommixedcharacterandnumbers'\
-        '\nfile:'\
-            '\n    - filekey: "filekey[please_insert_a_excessively_long_key]"'\
-        '\ndiscord:'\
-            '\n    - keyformatting: False'\
-            '\n    - peerid: 123456789123456789'
+    configfile = f"config_version={version}\n"\
+        "randomdata1=[please_insert_a_excessively_long_key]\n"\
+        "randomdata2=[please_insert_a_excessively_long_key]\n"\
+        "desdata1=11charsnumb\n"\
+        "desdata2=32randommixedcharacterandnumbers\n"\
+        "filekey=filekey[please_insert_a_excessively_long_key]\n"\
+        "discord_keyformatting=False\n"\
+        "discord_peerid=123456789123456789"
 
     for path in pathList:
         if os.path.exists(path):
@@ -45,62 +43,60 @@ def fileintegrity():
                 data.write(configfile)
             data.close()
 
-    # create the read stream 
-    stream = open(f'{path}/defaultconfig.yaml', 'r')
-    # load the yaml data with the loader
-    data = yaml.load(stream, Loader=yaml.FullLoader)
-
     # version verification
-    if os.path.isfile(f'{path}/defaultconfig.yaml') == True:
-        if data['class'][0]['identification'] != version:
+    loaded_config = dotenv_values(f'{path}\\ultishift\\config\\defaultconfig.ults')
+    
+    if os.path.isfile(f'{path}\\ultishift\\config\\defaultconfig.ults') == True:
+        if loaded_config['config_version'] != version:
             print('(FileIntegrity): Incorrect version!\n(FileIntegrity): Rebuilt the default config.')
-            shutil.copyfile(f'{path}/defaultconfig.yaml' , f'{path}/defaultconfig.yaml.old')
-            with open(f'{path}/defaultconfig.yaml','w') as file:
+            shutil.copyfile(f'{path}\\ultishift\\config\\defaultconfig.ults' , f'{path}\\ultishift\\config\\defaultconfig.ults.old')
+            with open(f'{path}\\ultishift\\config\\defaultconfig.ults','w') as file:
                 file.write(configfile)
             file.close()
     
     try:
-        configloader('defaultconfig.yaml', noexceptions=False)
+        configloader(config_filename, noexceptions=False)
     except:
-        print(Exception.with_traceback())
-        print('(FileIntegrity): \'defaultconfig.yaml\' seems to be broken.\n(FileIntegrity): Rebuilding new config.yaml..')
-        shutil.copyfile(f'{path}/defaultconfig.yaml' , f'{path}/defaultconfig.yaml.broken')
-        with open(f'{path}/defaultconfig.yaml','w') as file:
+        # print(Exception.with_traceback())
+        print('(FileIntegrity): \'defaultconfig.yaml\' seems to be broken.\n(FileIntegrity): Rebuilding new config.ults..')
+        shutil.copyfile(f'{path}\\ultishift\\config\\defaultconfig.ults' , f'{path}\\ultishift\\config\\defaultconfig.ults.broken')
+        with open(f'{path}\\ultishift\\config\\defaultconfig.ults','w') as file:
             file.write(configfile)
         file.close()
 
 def configloader(filename, noexceptions=False):
     try:
         # create the read stream
-        stream = open(f'{path}/ultishift/config/{filename}', 'r')
+        cl = dotenv_values(f'{path}\\ultishift\\config\\{filename}.ults')
+        print(cl['config_version'])
     except FileNotFoundError:
         return print(f'[ERROR] (ConfigLoader): \'{filename}\' doesn\'t exist.')
     except KeyError:
         return print(f'[ERROR] (ConfigLoader): \'{filename}\' is broken. Is the file up to date with the defaultconfig?')
     
     # load the yaml data with the loader
-    cl = yaml.load(stream, Loader=yaml.FullLoader)
+    # cl = yaml.load(stream, Loader=yaml.FullLoader)
 
-    if cl['class'][0]['identification'] == version:
+    if cl['config_version'] == version:
         # check desdata
         try:
-            if len(cl['desencrypt'][0]['desdata1']) != 11:
+            if len(cl['desdata1']) != 11:
                 if noexceptions == True:
                     return print(f'[ERROR] (ConfigLoader): \'desdata1\' has an invalid length. It must be 11 characters long.\n[ERROR] (ConfigLoader): Config has been reverted.')
                 print(f'[ERROR] (ConfigLoader): \'desdata1\' has an invalid length. It must be 11 characters long.')
                 raise ValueError
-            elif len(cl['desencrypt'][1]['desdata2']) != 32:
+            elif len(cl['desdata2']) != 32:
                 if noexceptions == True:
                     return print(f'[ERROR] (ConfigLoader): \'desdatay2\' has an invalid length. It must be 32 characters long.\n[ERROR] (ConfigLoader): Config has been reverted.')
                 raise ValueError
-            elif len(cl['desencrypt'][0]['desdata1']) == 11:
-                desmatch = re.search(r'^[^\W_]{3,48}$', cl['desencrypt'][0]['desdata1'])
+            elif len(cl['desdata1']) == 11:
+                desmatch = re.search(r'^[^\W_]{3,48}$', cl['desdata1'])
                 if desmatch == None:
                     if noexceptions == True:
                         return print(f'[ERROR] (ConfigLoader): \'desdata1\' contains non alphabetical and numerical data.\n[ERROR] (ConfigLoader): Config has been reverted.')
                     raise ValueError
-            elif len(cl['desencrypt'][1]['desdata2']) == 32:
-                desmatch = re.search(r'^[^\W_]{3,48}$', cl['desencrypt'][1]['desdata2'])
+            elif len(cl['desdata2']) == 32:
+                desmatch = re.search(r'^[^\W_]{3,48}$', cl['desdata2'])
                 if desmatch == None:
                     if noexceptions == True:
                         return print(f'[ERROR] (ConfigLoader): \'desdata2\' contains non alphabetical and numerical data.\n[ERROR] (ConfigLoader): Config has been reverted.')
@@ -112,11 +108,11 @@ def configloader(filename, noexceptions=False):
         
         # check private data
         try:
-            if len(cl['private'][0]['privatekey']) != 0: 
+            if len(cl['privatekey']) != 0: 
                 pass
-            elif len(cl['private'][1]['randomdata1']) != 0:
+            elif len(cl['randomdata1']) != 0:
                 pass
-            elif len(cl['private'][2]['randomdata2']) != 0:
+            elif len(cl['randomdata2']) != 0:
                 pass
         except:
             if noexceptions == True:
@@ -125,7 +121,7 @@ def configloader(filename, noexceptions=False):
 
         # check file data
         try:
-            if len(cl['file'][0]['filekey']) != 0:
+            if len(cl['filekey']) != 0:
                 pass
         except:
             if noexceptions == True:
@@ -134,9 +130,9 @@ def configloader(filename, noexceptions=False):
 
         # check discord data
         try:
-            if cl['discord'][0]['keyformatting'] == True:
+            if cl['keyformatting'] == True:
                 newdiscordformat = '```'
-            elif cl['discord'][0]['keyformatting'] == False:
+            elif cl['keyformatting'] == False:
                 newdiscordformat = ''
             else:
                 newdiscordformat = ''
@@ -148,19 +144,19 @@ def configloader(filename, noexceptions=False):
         
         # check discord peerid data
         try:
-            if len(str(cl['discord'][1]['peerid'])) <= 17:
+            if len(str(cl['peerid'])) <= 17:
                 print(f'[WARNING] (ConfigLoader): \'peerid\' hasn\'t been set or is invalid.')
-            elif len(str(cl['discord'][1]['peerid'])) == 18:
-                lettersinid = re.search(r'\d{18}', str(cl['discord'][1]['peerid']))
+            elif len(str(cl['peerid'])) == 18:
+                lettersinid = re.search(r'\d{18}', str(cl['peerid']))
                 if lettersinid == None:
                     print(f'[WARNING] (ConfigLoader): \'peerid\' is an invalid Discord userid.')
-            elif len(str(cl['discord'][1]['peerid'])) >= 18:
-                lettersinid = re.search(r'\d{18}', str(cl['discord'][1]['peerid']))
+            elif len(str(cl['peerid'])) >= 18:
+                lettersinid = re.search(r'\d{18}', str(cl['peerid']))
                 if lettersinid == None:
                     print(f'[WARNING] (ConfigLoader): \'peerid\' is an invalid Discord userid.')
-                if str(cl['discord'][1]['peerid']).__contains__(','):
+                if str(cl['peerid']).__contains__(','):
                     global idarray, peerid
-                    idarray = str(cl['discord'][1]['peerid']).split(',')
+                    idarray = str(cl['peerid']).split(',')
                     i = 0
                     peerid = ''
                     for data in idarray:
@@ -175,16 +171,16 @@ def configloader(filename, noexceptions=False):
                 return print(f'[ERROR] (ConfigLoader): \'discord\' has missing data.\n[ERROR] (ConfigLoader): Config has been reverted.')
             raise ValueError
         
-        global desdata1, desdata2, bigprivatekey, randomdata1, randomdata2, filekey, discordformat, loadedfile
-        desdata1 = cl['desencrypt'][0]['desdata1']
-        desdata2 = cl['desencrypt'][1]['desdata2']
-        bigprivatekey = cl['private'][0]['privatekey']
-        randomdata1 = cl['private'][1]['randomdata1']
-        randomdata2 = cl['private'][2]['randomdata2']
-        filekey = cl['file'][0]['filekey']
+        global desdata1, desdata2, bigprivatekey, randomdata1, randomdata2, filekey, discordformat, config_filename
+        desdata1 = cl['desdata1']
+        desdata2 = cl['desdata2']
+        bigprivatekey = cl['privatekey']
+        randomdata1 = cl['randomdata1']
+        randomdata2 = cl['randomdata2']
+        filekey = cl['filekey']
         discordformat = newdiscordformat
-        peerid = str(f"<@{cl['discord'][1]['peerid']}>")
-        loadedfile = filename
+        peerid = str(f"<@{cl['peerid']}>")
+        config_filename = filename
 
         configData = [bigprivatekey, randomdata1, randomdata2, desdata1, desdata2, filekey, peerid]
         
@@ -198,12 +194,12 @@ def configloader(filename, noexceptions=False):
             peerid = ''
 
         if defaultcheck != 0:
-            print(f'[WARNING] (ConfigLoader): You\'re still using default config data in \'{loadedfile}\'.')
+            print(f'[WARNING] (ConfigLoader): You\'re still using default config data in \'{config_filename}\'.')
 
-        return print(f'(ConfigLoader): \'{loadedfile}\' has been successfully loaded.')
+        return print(f'(ConfigLoader): \'{config_filename}\' has been successfully loaded.')
     else:
         if noexceptions == True:
-            return print(f'(ConfigLoader): Incorrect Version!\n(ConfigLoader): Reverting back to {loadedfile}.')
+            return print(f'(ConfigLoader): Incorrect Version!\n(ConfigLoader): Reverting back to {config_filename}.')
         raise ValueError
 
 def privatekey(request):
@@ -485,7 +481,7 @@ def np_list(directory):
 
 def main():
     try:
-        text = input(f'{"-"*44}\n--> Ultishift | Loaded: {loadedfile}\n{"-"*44}\n[A] Encrypt\n[B] Decrypt\n[C] File Encrypt\n[D] File Decrypt\n[E] Notepad - Encrypt\n[F] Notepad - Decrypt\n[G] Config Loader\n[X] Exit\n\nSelection: ')
+        text = input(f'{"-"*44}\n--> Ultishift | Loaded: {config_filename}\n{"-"*44}\n[A] Encrypt\n[B] Decrypt\n[C] File Encrypt\n[D] File Decrypt\n[E] Notepad - Encrypt\n[F] Notepad - Decrypt\n[G] Config Loader\n[X] Exit\n\nSelection: ')
         if text.lower() == 'a': # message encrypt only
             password = input('Password: ')
             data = str(input('Text2Encrypt: '))
